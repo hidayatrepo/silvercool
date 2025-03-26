@@ -9,6 +9,7 @@ use SilverStripe\ORM\Queries\SQLSelect;
 use App\Models\Karyawan;
 use App\Models\Bagian;
 use App\Models\Shift;
+use SilverStripe\ORM\DB;
 use SilverStripe\ORM\ValidationException;
 
 class KaryawanController extends Controller {
@@ -17,7 +18,6 @@ class KaryawanController extends Controller {
 
     // GET ALL DATA
     public function index(HTTPRequest $request) {
-        
         $body = $request->postVars();
 
         $query = SQLSelect::create()
@@ -30,99 +30,118 @@ class KaryawanController extends Controller {
             ])
             ->setFrom('"Karyawan"')
             ->addLeftJoin('Bagian', '"Karyawan"."BagianID" = "Bagian"."ID"')
-            ->addLeftJoin('Shift', '"Karyawan"."ShiftID" = "Shift"."ID"') // FIX: Join dengan ShiftID di Karyawan
+            ->addLeftJoin('Shift', '"Karyawan"."ShiftID" = "Shift"."ID"')
             ->setOrderBy('"Karyawan"."ID" ASC');
 
-        $nama = $body['Nama'] ?? '';
-        if (!empty($nama)) {
+        $nama = $body['Nama'] ?? null;
+        if (!empty($body['Nama'])) {
             $query->addWhere(["\"Karyawan\".\"Nama\" LIKE ?" => "%$nama%"]);
         }
 
         $data = iterator_to_array($query->execute());
 
-        return HTTPResponse::create(json_encode($data, JSON_PRETTY_PRINT))
-            ->addHeader('Content-Type', 'application/json; charset=utf-8')
-            ->setStatusCode(200);
+        return $this->jsonResponse(true, 'Data karyawan berhasil diambil', $data);
     }
 
-    // ADD KARYAWAN
+    // ADD DATA
     public function add(HTTPRequest $request) {
-        
         $body = $request->postVars();
 
-        if (!$body || !isset($body['Nama']) || !isset($body['BagianID']) || !isset($body['ShiftID'])) {
-            return $this->jsonResponse(['error' => 'Nama, BagianID, dan ShiftID wajib diisi'], 400);
+        if (empty($body['Nama']) || empty($body['BagianID']) || empty($body['ShiftID'])) {
+            return $this->jsonResponse(false, 'Nama, BagianID, dan ShiftID wajib diisi');
         }
 
+        $data = [
+            'Nama' => $body['Nama'],
+            'BagianID' => $body['BagianID'],
+            'ShiftID' => $body['ShiftID']
+        ];
+
+        DB::get_conn()->transactionStart();
         try {
-            $karyawan = Karyawan::create();
-            $karyawan->Nama = $body['Nama'];
-            $karyawan->BagianID = $body['BagianID'];
-            $karyawan->ShiftID = $body['ShiftID'];
+            $karyawan = Karyawan::create()->update($data);
             $karyawan->write();
 
-            return $this->jsonResponse(['message' => 'Karyawan berhasil ditambahkan', 'data' => $karyawan]);
+            DB::get_conn()->transactionEnd();
+            return $this->jsonResponse(true, 'Karyawan berhasil ditambahkan');
         } catch (ValidationException $e) {
-            return $this->jsonResponse(['error' => $e->getMessage()], 500);
+            DB::get_conn()->transactionRollback();
+            return $this->jsonResponse(false, $e->getMessage());
         }
     }
 
-    // UPDATE KARYAWAN
+    // UPDATE DATA
     public function update(HTTPRequest $request) {
-        
         $body = $request->postVars();
 
-        if (!$body || !isset($body['ID'])) {
-            return $this->jsonResponse(['error' => 'ID wajib diisi'], 400);
+        if (empty($body['ID'])) {
+            return $this->jsonResponse(false, 'ID wajib diisi');
         }
 
         $karyawan = Karyawan::get()->byID($body['ID']);
-
         if (!$karyawan) {
-            return $this->jsonResponse(['error' => 'Karyawan tidak ditemukan'], 404);
+            return $this->jsonResponse(false, 'Karyawan tidak ditemukan');
         }
 
-        try {
-            if (isset($body['Nama'])) $karyawan->Nama = $body['Nama'];
-            if (isset($body['BagianID'])) $karyawan->BagianID = $body['BagianID'];
-            if (isset($body['ShiftID'])) $karyawan->ShiftID = $body['ShiftID'];
+        $data = [];
+        if (!empty($body['Nama'])) $data['Nama'] = $body['Nama'];
+        if (!empty($body['BagianID'])) $data['BagianID'] = $body['BagianID'];
+        if (!empty($body['ShiftID'])) $data['ShiftID'] = $body['ShiftID'];
 
+        if (empty($data)) {
+            return $this->jsonResponse(false, 'Tidak ada data yang diubah');
+        }
+
+        DB::get_conn()->transactionStart();
+        try {
+            $karyawan->update($data);
             $karyawan->write();
 
-            return $this->jsonResponse(['message' => 'Karyawan berhasil diperbarui', 'data' => $karyawan]);
+            DB::get_conn()->transactionEnd();
+            return $this->jsonResponse(true, 'Karyawan berhasil diperbarui');
         } catch (ValidationException $e) {
-            return $this->jsonResponse(['error' => $e->getMessage()], 500);
+            DB::get_conn()->transactionRollback();
+            return $this->jsonResponse(false, $e->getMessage());
         }
     }
 
-    // DELETE KARYAWAN
+    // DELETE DATA
     public function delete(HTTPRequest $request) {
-        
         $body = $request->postVars();
 
-        if (!$body || !isset($body['ID'])) {
-            return $this->jsonResponse(['error' => 'ID wajib diisi'], 400);
+        if (empty($body['ID'])) {
+            return $this->jsonResponse(false, 'ID wajib diisi');
         }
 
         $karyawan = Karyawan::get()->byID($body['ID']);
-
         if (!$karyawan) {
-            return $this->jsonResponse(['error' => 'Karyawan tidak ditemukan'], 404);
+            return $this->jsonResponse(false, 'Karyawan tidak ditemukan');
         }
 
+        DB::get_conn()->transactionStart();
         try {
             $karyawan->delete();
 
-            return $this->jsonResponse(['message' => 'Karyawan berhasil dihapus']);
+            DB::get_conn()->transactionEnd();
+            return $this->jsonResponse(true, 'Karyawan berhasil dihapus');
         } catch (ValidationException $e) {
-            return $this->jsonResponse(['error' => $e->getMessage()], 500);
+            DB::get_conn()->transactionRollback();
+            return $this->jsonResponse(false, $e->getMessage());
         }
     }
 
     // HELPER FUNCTION: JSON RESPONSE
-    private function jsonResponse($data, $status = 200) {
-        return HTTPResponse::create(json_encode($data, JSON_PRETTY_PRINT))
+    private function jsonResponse($result, $message, $data = null) {
+        $response = [
+            'result' => $result,
+            'message' => $message
+        ];
+        if ($result && $data !== null) {
+            $response['data'] = $data;
+        }
+
+        return HTTPResponse::create(json_encode($response, JSON_PRETTY_PRINT))
             ->addHeader('Content-Type', 'application/json; charset=utf-8')
-            ->setStatusCode($status);
+            ->setStatusCode($result ? 200 : 400);
     }
 }
