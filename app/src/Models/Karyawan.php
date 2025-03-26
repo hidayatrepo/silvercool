@@ -32,4 +32,17 @@ class Karyawan extends DataObject
         'Shift.NamaBagian' => 'Shift',
         'FotoNama' => 'Foto' // Tampilkan nama file foto di CMS
     ];
+
+    /**
+     * Method to set a default FotoNama if it's not provided
+     */
+    public function onBeforeWrite()
+    {
+        parent::onBeforeWrite();
+
+        // Set default FotoNama if it's null or empty
+        if (empty($this->FotoNama)) {
+            $this->FotoNama = 'karyawan/default.png';
+        }
+    }
 }
