@@ -10,7 +10,7 @@ class Karyawan extends DataObject
 
     private static $db = [
         'Nama' => 'Varchar(255)', // ✅ Sebaiknya tentukan panjang varchar
-        'Flag' => 'Boolean'
+        'Flag' => 'Boolean(1)'
     ];
 
     private static $has_one = [
