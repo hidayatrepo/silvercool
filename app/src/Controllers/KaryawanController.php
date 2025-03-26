@@ -11,6 +11,9 @@ use App\Models\Bagian;
 use App\Models\Shift;
 use SilverStripe\ORM\DB;
 use SilverStripe\ORM\ValidationException;
+use SilverStripe\Assets\Image; // ✅ Tambahkan ini
+use SilverStripe\Assets\Upload; // ✅ Tambahkan ini
+use SilverStripe\Core\Convert;
 
 class KaryawanController extends Controller {
 
@@ -26,6 +29,7 @@ class KaryawanController extends Controller {
                 '"Karyawan"."Nama"',
                 '"Bagian"."NamaBagian" AS "Bagian"',
                 '"Shift"."NamaShift" AS "Shift"',
+                'CONCAT(\'/assets/\', "Karyawan"."FotoNama") AS "Foto"',
                 '"Karyawan"."Flag"',
             ])
             ->setFrom('"Karyawan"')
@@ -33,8 +37,10 @@ class KaryawanController extends Controller {
             ->addLeftJoin('Shift', '"Karyawan"."ShiftID" = "Shift"."ID"')
             ->setOrderBy('"Karyawan"."ID" ASC');
 
-        $nama = $body['Nama'] ?? null;
-        if (!empty($body['Nama'])) {
+        // Bersihkan input Nama sebelum dipakai
+        $nama = !empty($body['Nama']) ? trim(Convert::raw2sql($body['Nama'])) : null;
+
+        if ($nama) {
             $query->addWhere(["\"Karyawan\".\"Nama\" LIKE ?" => "%$nama%"]);
         }
 
@@ -46,6 +52,7 @@ class KaryawanController extends Controller {
     // ADD DATA
     public function add(HTTPRequest $request) {
         $body = $request->postVars();
+        $files = $_FILES; // Ambil file yang diunggah
 
         if (empty($body['Nama']) || empty($body['BagianID']) || empty($body['ShiftID'])) {
             return $this->jsonResponse(false, 'Nama, BagianID, dan ShiftID wajib diisi');
@@ -62,6 +69,23 @@ class KaryawanController extends Controller {
             $karyawan = Karyawan::create()->update($data);
             $karyawan->write();
 
+            // **🔹 Jika ada file gambar yang diunggah**
+            if (!empty($files['Foto']['name'])) {
+                // **Upload gambar menggunakan Upload class**
+                $foto = Image::create(); // Create an empty Image object
+                $upload = new Upload();
+
+                // Try to upload the file
+                $upload->loadIntoFile($files['Foto'], $foto, 'karyawan');
+
+                // Pastikan file valid
+                if ($foto && $foto->exists()) { // Ensure $foto is a valid Image object
+                    // Simpan nama file, bukan FotoID
+                    $karyawan->FotoNama = $foto->getFilename(); // Save the file name, not the ID
+                    $karyawan->write();
+                }
+            }
+
             DB::get_conn()->transactionEnd();
             return $this->jsonResponse(true, 'Karyawan berhasil ditambahkan');
         } catch (ValidationException $e) {
@@ -73,6 +97,7 @@ class KaryawanController extends Controller {
     // UPDATE DATA
     public function update(HTTPRequest $request) {
         $body = $request->postVars();
+        $files = $_FILES; // Ambil file yang diunggah
 
         if (empty($body['ID'])) {
             return $this->jsonResponse(false, 'ID wajib diisi');
@@ -88,14 +113,27 @@ class KaryawanController extends Controller {
         if (!empty($body['BagianID'])) $data['BagianID'] = $body['BagianID'];
         if (!empty($body['ShiftID'])) $data['ShiftID'] = $body['ShiftID'];
 
-        if (empty($data)) {
-            return $this->jsonResponse(false, 'Tidak ada data yang diubah');
-        }
-
         DB::get_conn()->transactionStart();
         try {
             $karyawan->update($data);
             $karyawan->write();
+
+            // **🔹 Jika ada file gambar yang diunggah**
+            if (!empty($files['Foto']['name'])) {
+                // **Upload gambar menggunakan Upload class**
+                $foto = Image::create(); // Create an empty Image object
+                $upload = new Upload();
+
+                // Try to upload the file
+                $upload->loadIntoFile($files['Foto'], $foto, 'karyawan');
+
+                // Pastikan file valid
+                if ($foto && $foto->exists()) { // Ensure $foto is a valid Image object
+                    // Simpan nama file, bukan FotoID
+                    $karyawan->FotoNama = $foto->getFilename(); // Save the file name, not the ID
+                    $karyawan->write();
+                }
+            }
 
             DB::get_conn()->transactionEnd();
             return $this->jsonResponse(true, 'Karyawan berhasil diperbarui');
@@ -109,11 +147,12 @@ class KaryawanController extends Controller {
     public function delete(HTTPRequest $request) {
         $body = $request->postVars();
 
-        if (empty($body['ID'])) {
+        $id = isset($body['ID']) ? (int) $body['ID'] : 0;
+        if ($id <= 0) {
             return $this->jsonResponse(false, 'ID wajib diisi');
         }
 
-        $karyawan = Karyawan::get()->byID($body['ID']);
+        $karyawan = Karyawan::get()->byID($id);
         if (!$karyawan) {
             return $this->jsonResponse(false, 'Karyawan tidak ditemukan');
         }
