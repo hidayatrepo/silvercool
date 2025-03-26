@@ -14,13 +14,15 @@ class Karyawan extends DataObject
     ];
 
     private static $has_one = [
-        'Bagian' => Bagian::class
+        'Bagian' => Bagian::class,
+        'Shift'  => Shift::class
     ];
 
     private static $summary_fields = [ // ✅ Tambahkan summary untuk GridField
         'ID',
         'Nama',
         'Flag',
-        'Bagian.NamaBagian' => 'Bagian'
+        'Bagian.NamaBagian' => 'Bagian',
+        'Shift.NamaBagian' => 'Shift'
     ];
 }

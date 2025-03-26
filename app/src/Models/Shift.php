@@ -4,13 +4,13 @@ namespace App\Models;
 
 use SilverStripe\ORM\DataObject;
 
-class Bagian extends DataObject
+class Shift extends DataObject
 {
-    private static $table_name = 'Bagian';
+    private static $table_name = 'Shift';
 
     private static $db = [
-        'NamaBagian' => 'Varchar(255)',
-        'Flag'       => 'Boolean(1)' // ✅ Default 1
+        'NamaShift' => 'Varchar(255)',
+        'Flag'      => 'Boolean(1)' // ✅ Default 1
     ];
 
     private static $has_many = [
@@ -19,7 +19,7 @@ class Bagian extends DataObject
 
     private static $summary_fields = [
         'ID',
-        'NamaBagian',
+        'NamaShift',
         'Flag'
     ];
 }
