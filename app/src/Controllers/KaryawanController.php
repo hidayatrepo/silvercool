@@ -21,11 +21,11 @@ class KaryawanController extends Controller {
             ->setSelect([
                 '"Karyawan"."ID"',
                 '"Karyawan"."Nama"',
+                '"Bagian"."NamaBagian" AS "Bagian"',
                 '"Karyawan"."Flag"',
-                '"Bagian"."NamaBagian" AS "Bagian"'
             ])
             ->setOrderBy('"Karyawan"."Nama" ASC');
-            
+
         $data = iterator_to_array($query->execute());
 
         return HTTPResponse::create(json_encode($data, JSON_PRETTY_PRINT))
